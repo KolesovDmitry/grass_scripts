@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+# -*- coding: utf-8  -*-
+
+#%Module
+#% description: Return list of maps that intersect with point
+#%End
+#%option
+#% key: pattern
+#% type: string
+#% description: pattern for map names
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: type
+#% type: string
+#% description: type of maps
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: coordinates
+#% type: string
+#% description: east,north coordinates
+#% required : yes
+#% multiple: yes
+#%end
+#%option
+#% key: separator
+#% type: string
+#% description: separator string
+#% required : yes
+#% multiple: no
+#%end
+
+
+import sys
+
+import grass.script as grass
+
+
+def main(options, flags):
+    pattern = options['pattern']
+    map_type = options['type']
+    if map_type not in ['rast']:
+        raise ValueError("Type %s does't supported" % (map_type, ))
+    coordinates = options['coordinates']
+    separator = options['separator']
+
+    east, north = coordinates.split(',')
+    east, north = float(east), float(north)
+
+
+    grass.use_temp_region()
+
+    maps = grass.read_command('g.list', type=map_type, pattern=pattern, separator=',')
+    maps = maps.strip()
+
+    grass.run_command('g.region', s=north-10, n=north+10, e=east+10, w=east-10)
+
+    values = grass.read_command('r.what', map=maps, coordinates=coordinates, separator=',')
+    values = values.strip()
+    values = values.split(',')[3:]  # delete coordinates
+
+    maps = maps.split(',')
+    intersecting = [m for m, v in zip(maps, values) if v == '*']
+
+    print separator.join(intersecting)
+
+
+if __name__ == "__main__":
+    options, flags = grass.parser()
+    main(options, flags)
+    sys.exit(0)
