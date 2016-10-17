@@ -63,7 +63,7 @@ def main(options, flags):
     values = values.split(',')[3:]  # delete coordinates
 
     maps = maps.split(',')
-    intersecting = [m for m, v in zip(maps, values) if v == '*']
+    intersecting = [m for m, v in zip(maps, values) if v != '*']
 
     print separator.join(intersecting)
 
