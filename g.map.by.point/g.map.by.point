@@ -19,6 +19,13 @@
 #% multiple: no
 #%end
 #%option
+#% key: mapset
+#% type: string
+#% description: type of maps
+#% required : no
+#% multiple: no
+#%end
+#%option
 #% key: coordinates
 #% type: string
 #% description: east,north coordinates
@@ -29,7 +36,8 @@
 #% key: separator
 #% type: string
 #% description: separator string
-#% required : yes
+#% required: no
+#% answer: ,
 #% multiple: no
 #%end
 
@@ -44,6 +52,12 @@ def main(options, flags):
     map_type = options['type']
     if map_type not in ['rast']:
         raise ValueError("Type %s does't supported" % (map_type, ))
+
+    mapset = options['mapset']
+    if mapset == '':
+        mapset = grass.read_command('g.mapset', flags='p')
+        mapset = mapset.strip()
+
     coordinates = options['coordinates']
     separator = options['separator']
 
@@ -53,7 +67,7 @@ def main(options, flags):
 
     grass.use_temp_region()
 
-    maps = grass.read_command('g.list', type=map_type, pattern=pattern, separator=',')
+    maps = grass.read_command('g.list', type=map_type, mapset=mapset, pattern=pattern, separator=',', flags='m')
     maps = maps.strip()
 
     grass.run_command('g.region', s=north-10, n=north+10, e=east+10, w=east-10)
