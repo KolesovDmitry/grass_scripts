@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+# -*- coding: utf-8  -*-
+
+#%Module
+#% description: Apply trained sklearn model to input maps, store results as raster
+#%End
+#%option
+#% key: inputs
+#% type: string
+#% description: map names
+#% required : yes
+#% multiple: yes
+#%end
+#%option
+#% key: model
+#% type: string
+#% description: path to pickled sklearn model
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: output
+#% type: string
+#% description: list of names for result rasters
+#% required : yes
+#% multiple: no
+#%end
+
+
+
+import sys
+import pickle
+
+import numpy as np
+
+import grass.script as grass
+import grass.script.array as garray
+
+
+def main(options, flags):
+    input_names = options['inputs']
+    model_name = options['model']
+    outputs_name = options['output']
+
+    model = pickle.load(open(model_name, 'rb'))
+
+    inputs = input_names.split(',')
+    map_count = len(inputs)
+    
+    region_info = grass.region()
+    cells = region_info['cells']
+
+    in_array = np.empty((cells, map_count))
+
+    for num, map_name in enumerate(inputs):
+        tmp = garray.array()    
+        tmp.read(map_name)
+        in_array[:, num] = tmp.ravel()
+
+    result = model.predict(in_array)
+    result_map = garray.array()
+    result_map[...] = result.reshape(tmp.shape)
+    result_map.write(outputs_name)
+
+
+if __name__ == "__main__":
+    options, flags = grass.parser()
+    main(options, flags)
+    sys.exit(0)
