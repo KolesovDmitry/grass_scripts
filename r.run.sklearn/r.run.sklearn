@@ -32,9 +32,13 @@ import sys
 import pickle
 
 import numpy as np
+from sklearn import preprocessing
 
 import grass.script as grass
 import grass.script.array as garray
+
+
+CNULL = -2147483648
 
 
 def main(options, flags):
@@ -54,13 +58,28 @@ def main(options, flags):
 
     for num, map_name in enumerate(inputs):
         tmp = garray.array()    
-        tmp.read(map_name)
+        tmp.read(map_name, null=np.nan)
         in_array[:, num] = tmp.ravel()
 
-    result = model.predict(in_array)
+    # Mask NaN before using '.predict' method
+    # it prevent the error "Input contains NaN, infinity or a value too large"
+    # To do that:
+    #   * find all NULL values, replace them by a not-NULL value and remember their locations 
+    #   * use model (data doesn't contain NaNs)
+    #   * replace the NULL-locations in the result by NULLs
+
+    nan_indexes = np.any(np.isnan(in_array), axis=1)
+
+    # impute = preprocessing.Imputer(strategy='most_frequent')  # This is good choice for nominal data, but it is too slow
+    impute = preprocessing.Imputer(strategy='mean')  # In most cases the startegy will work
+    x_data = impute.fit_transform(in_array)
+
+    result = model.predict(x_data)
+    result[nan_indexes] = CNULL 
+
     result_map = garray.array()
     result_map[...] = result.reshape(tmp.shape)
-    result_map.write(outputs_name)
+    result_map.write(outputs_name, null=CNULL)
 
 
 if __name__ == "__main__":
