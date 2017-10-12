@@ -125,9 +125,10 @@ def process_area(lines, area_map, result_map):
     try:
         del_in_poly(lines, area_map, cutted_lines)
         points = get_cut_coords(cutted_lines, area_map)
-        centroid = get_centroid(area_map, 1)
-        create_segments(points, centroid, radius_map)
-        patch_snap([radius_map, cutted_lines], result_map)
+        if points != []:
+            centroid = get_centroid(area_map, 1)
+            create_segments(points, centroid, radius_map)
+            patch_snap([radius_map, cutted_lines], result_map)
     finally:
         grass.run_command('g.remove', type='vect', name=cutted_lines, flags='f')
         grass.run_command('g.remove', type='vect', name=radius_map, flags='f')
