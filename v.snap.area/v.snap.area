@@ -1,0 +1,183 @@
+#!/usr/bin/env python
+# -*- coding: utf-8  -*-
+#%module
+#% description: Snap lines to area centroid
+#% keyword: vector
+#% keyword: generalization
+#% keyword: line
+#%end
+#%option
+#% key: ainput
+#% type: string
+#% description: name of line map
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: binput
+#% type: string
+#% description: name of area map
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: output
+#% type: string
+#% description: name of out map
+#% required : yes
+#% multiple: no
+#%end
+
+import sys
+import uuid
+import grass.script as grass
+
+EPSILON = 0.00001
+
+
+def temp_name():
+    return 'tmp' + uuid.uuid4().hex
+
+
+def get_centroid(map_name, cat):
+    sep = '|'
+    line = grass.read_command(
+        'v.out.ascii',
+         input=map_name,
+         type='centroid',
+         cats=cat,
+         separator=sep
+    )
+    x, y, _ = line.split(sep)
+
+    return (x, y)
+
+
+def del_in_poly(lines_name, poly_name, result_name):
+    """Delete all lines inside polygon
+    """
+    grass.run_command(
+        'v.overlay',
+        ainput=lines_name, binput=poly_name,
+        operator='not',
+        output=result_name,
+        overwrite=grass.overwrite()
+    )
+
+
+def get_cut_coords(lines_name, poly_name):
+    """Find points that lay on boundary of the polygon.
+    Return list of the point coordinates.
+    """
+    sep = '|'
+
+    temp_points = temp_name()
+    buffer_name = temp_name()
+    selected_points = temp_name()
+    result = ''
+    try:
+        grass.run_command('v.to.points', input=lines_name, output=temp_points)
+        # Point and boundary coordiantes can be slight different => use small
+        # bufer for selection
+        grass.run_command('v.buffer', input=poly_name, output=buffer_name, distance=EPSILON)
+        grass.run_command('v.select', ainput=temp_points, binput=buffer_name, output=selected_points)
+        result = grass.read_command('v.out.ascii', input=selected_points, separator=sep)
+    finally:
+        maps = ','.join([temp_points, buffer_name, selected_points])
+        grass.run_command('g.remove', type='vect', name=maps, flags='f')
+
+    result = result.split()
+    result = [r.split(sep) for r in result]
+    result = [(x, y) for (x, y, _) in result]
+    return result
+
+
+def create_segments(points, center, map_name):
+    """Create new map of lines between center and points
+    """
+    text = ["%s,%s\n%s,%s\n" % (p[0], p[1], center[0], center[1]) for p in points]
+    text = "NaN,NaN\n".join(text)
+    grass.write_command('v.in.lines', input='-', output=map_name, separator=',', stdin=text)
+
+
+def patch_snap(map_list, result_name):
+    """Patch maps, snap the nodes"""
+    maps = ','.join(map_list)
+    patch_map = temp_name()
+    try:
+        grass.run_command('v.patch', input=maps, output=patch_map)
+        grass.run_command(
+            'v.clean',
+            input=patch_map, output=result_name,
+            tool='snap', threshold=2*EPSILON,
+            flags="c"
+        )
+    finally:
+        grass.run_command('g.remove', type='vect', name=patch_map, flags='f')
+
+
+def process_area(lines, area_map, result_map):
+    """Clip and generalize lines for one area.
+    !!!area_map must have one polygon only, the category of the centroid==1 !!!
+    """
+    cutted_lines = temp_name()
+    radius_map = temp_name()
+    try:
+        del_in_poly(lines, area_map, cutted_lines)
+        points = get_cut_coords(cutted_lines, area_map)
+        centroid = get_centroid(area_map, 1)
+        create_segments(points, centroid, radius_map)
+        patch_snap([radius_map, cutted_lines], result_map)
+    finally:
+        grass.run_command('g.remove', type='vect', name=cutted_lines, flags='f')
+        grass.run_command('g.remove', type='vect', name=radius_map, flags='f')
+
+
+def get_area_cats(map_name):
+    sep = "|"
+    data = grass.read_command('v.out.ascii', input=map_name, separator=sep)
+    data = data.split()
+    data = [d for d in data]
+    data = [d.split(sep)[2] for d in data]
+
+    return data
+
+def extract_poly(map_name, poly_cat, out, new_cat=1):
+    """Extract polygon with category number 'poly_cat' into map 'out'.
+    Set new category to 'new_cat'
+    """
+    grass.run_command(
+        'v.extract',
+        input=map_name, output=out,
+        cats=poly_cat, new=new_cat, type='area',
+        overwrite=True
+    )
+
+
+def main(options, flags):
+    ainput = options['ainput']
+    binput = options['binput']
+    output = options['output']
+
+    centroid_category = 1   # !!! process_area uses only '1' (see source of the function)
+    categories = get_area_cats(binput)
+
+    tmp_lines = temp_name()
+    tmp_area = temp_name()
+    try:
+        grass.run_command('g.copy', vect="%s,%s" % (ainput, tmp_lines), overwrite=grass.overwrite())
+
+        for cat in categories:
+            extract_poly(binput, cat, tmp_area, new_cat=centroid_category)
+            process_area(tmp_lines, tmp_area, output)
+            grass.run_command('g.copy', vect="%s,%s" % (output, tmp_lines), overwrite=True)
+    finally:
+        grass.run_command('g.remove', type='vect', name=tmp_lines, flags='f')
+        grass.run_command('g.remove', type='vect', name=tmp_area, flags='f')
+
+
+
+if __name__ == "__main__":
+    options, flags = grass.parser()
+    main(options, flags)
+    sys.exit(0)
