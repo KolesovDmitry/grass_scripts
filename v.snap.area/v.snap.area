@@ -48,6 +48,7 @@ def get_centroid(map_name, cat):
          cats=cat,
          separator=sep
     )
+    print "CENTROID:", line
     x, y, _ = line.split(sep)
 
     return (x, y)
@@ -102,18 +103,21 @@ def create_segments(points, center, map_name):
 
 def patch_snap(map_list, result_name):
     """Patch maps, snap the nodes"""
+    # Skip snapping: it takes a lot of time. Snap lines after all processing steps
+
     maps = ','.join(map_list)
-    patch_map = temp_name()
-    try:
-        grass.run_command('v.patch', input=maps, output=patch_map)
-        grass.run_command(
-            'v.clean',
-            input=patch_map, output=result_name,
-            tool='snap', threshold=2*EPSILON,
-            flags="c"
-        )
-    finally:
-        grass.run_command('g.remove', type='vect', name=patch_map, flags='f')
+    # patch_map = temp_name()
+    # try:
+    print 'PATCHING:', maps
+    grass.run_command('v.patch', input=maps, output=result_name, overwrite=True)
+        # grass.run_command(
+            # 'v.clean',
+            # input=patch_map, output=result_name,
+            # tool='snap', threshold=2*EPSILON,
+            # flags="c"
+        # )
+    # finally:
+        # grass.run_command('g.remove', type='vect', name=patch_map, flags='f')
 
 
 def process_area(lines, area_map, result_map):
@@ -123,12 +127,18 @@ def process_area(lines, area_map, result_map):
     cutted_lines = temp_name()
     radius_map = temp_name()
     try:
+        print "DEL:", lines, area_map, cutted_lines
         del_in_poly(lines, area_map, cutted_lines)
         points = get_cut_coords(cutted_lines, area_map)
+        print 'POINTS FOUND:', len(points)
         if points != []:
             centroid = get_centroid(area_map, 1)
+            print 'SEGMENTS:',  radius_map
             create_segments(points, centroid, radius_map)
             patch_snap([radius_map, cutted_lines], result_map)
+            print 'RESULT map CREATED:', result_map
+        else:
+            grass.run_command('g.copy', vect="%s,%s" % (lines, result_map), overwrite=True)
     finally:
         grass.run_command('g.remove', type='vect', name=cutted_lines, flags='f')
         grass.run_command('g.remove', type='vect', name=radius_map, flags='f')
@@ -168,7 +178,10 @@ def main(options, flags):
     try:
         grass.run_command('g.copy', vect="%s,%s" % (ainput, tmp_lines), overwrite=grass.overwrite())
 
+        i = 0
         for cat in categories:
+            print 'ITERATION %s/%s' % (i, len(categories)) 
+            i += 1
             extract_poly(binput, cat, tmp_area, new_cat=centroid_category)
             process_area(tmp_lines, tmp_area, output)
             grass.run_command('g.copy', vect="%s,%s" % (output, tmp_lines), overwrite=True)
