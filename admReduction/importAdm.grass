@@ -1,0 +1,15 @@
+#!/bin/bash
+
+skip=$1
+
+if [ -z  "$(g.list vect pattern=adm)" ]
+then
+    v.in.ogr input=Data/adm.shp out=adm  snap=10 
+else
+    if [ "$skip" = "yes" ]
+    then
+        echo "Skipping..."
+    else
+       v.in.ogr input=Data/adm.shp out=adm snap=10  --o
+    fi
+fi

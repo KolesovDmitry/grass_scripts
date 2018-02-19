@@ -1,0 +1,15 @@
+#!/bin/bash
+
+skip=$1
+
+if [ -z  "$(g.list vect pattern=land)" ]
+then
+    v.in.ogr input=Data/ne50m_aa.shp out=land 
+else
+    if [ "$skip" = "yes" ]
+    then
+        echo "Skipping..."
+    else
+        v.in.ogr input=Data/ne50m_aa.shp out=land --o
+    fi
+fi

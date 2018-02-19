@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+skip=$1
+
+if [ -z  "$(g.list vect pattern=land_diss)" ]
+then
+    v.dissolve land out=land_diss col=FID
+else
+    if [ "$skip" = "yes" ]
+    then
+        echo "Skipping..."
+    else
+       v.dissolve land out=land_diss col=FID --o
+    fi
+fi

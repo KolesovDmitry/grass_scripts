@@ -1,0 +1,47 @@
+#!/bin/bash
+
+AREA_THR=10000000
+REDUCTION_ITERATION=3 # Число итераций упрощения. После последней итерации останутся узлы, лежащие не ближе друг к другу, чем 10*2^REDUCTION_ITERATION
+
+
+function simplify() {
+    VECT=$1
+    ITER=$2
+    RESULT_NAME=$3
+
+    # Последовательно упрощаем границы шаг за шагом, если сделать все сразу - возникают самопересечения границ
+    THR=10
+    g.copy vect=$VECT,${VECT}_${THR} --o; 
+    for NUM in $(seq $ITER); 
+    do 
+        PREV=$THR; THR=$(expr 2 "*" $THR); 
+        v.clean ${VECT}_${PREV} out=tmp_$$ tool=rmarea thr=$AREA_THR --o
+        v.generalize tmp_$$ out=${VECT}_$THR meth=reduction thr=$THR --o; 
+    done
+    v.clean ${VECT}_${THR} out=$RESULT_NAME tool=rmarea thr=$AREA_THR --o
+    g.remove type=vect name=tmp_$$
+}
+
+v.overlay ain=adm bin=land oper=and out=adm_clp --o
+
+v.clean adm_clp  out=adm_clp_small  tool=rmarea thr=$AREA_THR --o
+
+simplify adm_clp_small $REDUCTION_ITERATION result
+
+# Последовательно упрощаем границы шаг за шагом, если сделать все сразу - возникают самопересечения границ
+# THR=10
+# g.copy vect=land_simple,land_simple$THR --o; 
+# for NUM in $(seq $REDUCTION_ITERATION); 
+# do 
+    # PREV=$THR; 
+    # THR=$(expr 2 "*" $THR); 
+    # v.generalize land_simple$PREV out=land_simple$THR meth=reduction thr=$THR --o; 
+# done
+# LAST_LAND=land_simple$THR 
+# 
+# Последовательно упрощаем границы шаг за шагом, если сделать все сразу - возникают самопересечения границ
+
+
+v.out.ogr result out=result_${REDUCTION_ITERATION} --o
+
+

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+skip=$1
+
+if [ -z  "$(g.list vect pattern=land_diss)" ]
+then
+    v.proj location=epsg4326 mapset=PERMANENT input=land_diss out=land_diss 
+else
+    if [ "$skip" = "yes" ]
+    then
+        echo "Skipping..."
+    else
+       v.proj location=epsg4326 mapset=PERMANENT input=land_diss out=land_diss --o
+    fi
+fi

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+skip=$1
+
+if [ -z  "$(g.list vect pattern=land_single)" ]
+then
+    v.category land_diss opt=del out=land_single
+else
+    if [ "$skip" = "yes" ]
+    then
+        echo "Skipping..."
+    else
+        v.category land_diss opt=del out=land_single --o
+    fi
+fi
